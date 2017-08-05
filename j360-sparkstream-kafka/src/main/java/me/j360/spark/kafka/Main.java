@@ -1,11 +1,16 @@
 package me.j360.spark.kafka;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import kafka.serializer.StringDecoder;
+import me.j360.spark.kafka.util.redis.JedisUtil;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.streaming.Duration;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.*;
 import org.apache.spark.streaming.kafka.KafkaUtils;
+import redis.clients.jedis.Jedis;
 import scala.Tuple2;
 
 import java.util.*;
@@ -20,13 +25,20 @@ import java.util.regex.Pattern;
 public class Main {
 
     private static final Pattern SPACE = Pattern.compile(" ");
+    private static final String ipAddr = "123.59.27.210";
+    private static final int port = 6379;
+    private static Jedis jedis= null;
+    private static String DMPREDIS = "tv:vp:dmp:%d";
 
     private Main() {
     }
 
+
     public static void main(String[] args) throws Exception {
-        directKafka(args);
+        jedis = JedisUtil.getInstance().getJedis(ipAddr, port);
+        directKafkaDMP(args);
     }
+
 
     public static void kafka(String[] args)  throws Exception{
         if (args.length < 4) {
@@ -114,4 +126,77 @@ public class Main {
         jssc.start();
         jssc.awaitTermination();
     }
+
+
+    public static void directKafkaDMP(String[] args) throws Exception {
+        /*if (args.length < 2) {
+            System.err.println("Usage: JavaDirectKafkaWordCount <brokers> <topics>\n" +
+                    "  <brokers> is a list of one or more Kafka brokers\n" +
+                    "  <topics> is a list of one or more kafka topics to consume from\n\n");
+            System.exit(1);
+        }
+
+        //StreamingExamples.setStreamingLogLevels();
+
+        String brokers = args[0];
+        String topics = args[1];*/
+
+        String brokers = "localhost:9092";
+        String topics = "dmp";
+
+        // Create context with a 2 seconds batch interval
+        SparkConf sparkConf = new SparkConf().setAppName("JavaDirectKafkaWordCount");
+        JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(2));
+
+        Set<String> topicsSet = new HashSet<>(Arrays.asList(topics.split(",")));
+        Map<String, String> kafkaParams = new HashMap<>();
+        kafkaParams.put("metadata.broker.list", brokers);
+
+        // Create direct kafka stream with brokers and topics
+        JavaPairInputDStream<String, String> messages = KafkaUtils.createDirectStream(
+                jssc,
+                String.class,
+                String.class,
+                StringDecoder.class,
+                StringDecoder.class,
+                kafkaParams,
+                topicsSet
+        );
+
+        //{"uid":"068b746ed4620d25e26055a9f804385f","device_id":"068b746ed4620d25e26055a9f804385f","vp_id":1,"event_time":"1430204612405","os_type":"Android","play_count":6}
+        // Get the lines, split them into words, count the words and print
+
+        JavaDStream<PlayCount> events = messages.map(line -> {
+            JsonObject resultObject = new JsonParser().parse(line._2()).getAsJsonObject();
+            Long vpId = resultObject.get("vp_id").getAsLong();
+            int count = resultObject.get("play_count").getAsInt();
+            return new PlayCount(vpId, count);
+        });
+
+        JavaPairDStream<Long, Integer> playStream = events.mapToPair(new IpTuple());
+        JavaPairDStream<Long, Integer> playCountStream = playStream.reduceByKey((i1, i2) -> i1 + i2);
+
+        playCountStream.foreachRDD( rdd -> {
+            rdd.foreachPartition( partRecords -> {
+                partRecords.forEachRemaining( pair -> {
+                    Long vpId = pair._1();
+                    Integer count = pair._2();
+
+                    //写入到redis
+                    String key = String.format(DMPREDIS, vpId);
+                    jedis.incrBy(key, count);
+                });
+            });
+        });
+
+        //playCountStream.print();
+        // Start the computation
+        jssc.start();
+        jssc.awaitTermination();
+    }
+
+    public static final class IpTuple implements PairFunction< PlayCount, Long, Integer> {
+        public Tuple2< Long, Integer> call( PlayCount playCount) { return new Tuple2<>( playCount.getVpId(), playCount.getCount()); }
+    }
 }
+
