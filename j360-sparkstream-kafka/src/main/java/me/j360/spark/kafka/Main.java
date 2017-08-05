@@ -128,6 +128,13 @@ public class Main {
     }
 
 
+    /**
+     * 需要自己控制offset,使用jedis控制
+     * http://www.cnblogs.com/itboys/p/6036376.html
+     * http://blog.csdn.net/xiao_jun_0820/article/details/46911775
+     * @param args
+     * @throws Exception
+     */
     public static void directKafkaDMP(String[] args) throws Exception {
         /*if (args.length < 2) {
             System.err.println("Usage: JavaDirectKafkaWordCount <brokers> <topics>\n" +
@@ -189,6 +196,20 @@ public class Main {
             });
         });
 
+        // Hold a reference to the current offset ranges, so it can be used downstream
+        /*AtomicReference<OffsetRange[]> offsetRanges = new AtomicReference<>();
+        messages.transformToPair(rdd -> {
+            OffsetRange[] offsets = ((HasOffsetRanges) rdd.rdd()).offsetRanges();
+            offsetRanges.set(offsets);
+            return rdd;
+        }).map(
+
+        ).foreachRDD(rdd -> {
+            for (OffsetRange o : offsetRanges.get()) {
+                System.out.println(o.topic() + " " + o.partition() + " " + o.fromOffset() + " " + o.untilOffset());
+            }
+        });*/
+
         //playCountStream.print();
         // Start the computation
         jssc.start();
@@ -198,5 +219,52 @@ public class Main {
     public static final class IpTuple implements PairFunction< PlayCount, Long, Integer> {
         public Tuple2< Long, Integer> call( PlayCount playCount) { return new Tuple2<>( playCount.getVpId(), playCount.getCount()); }
     }
+
+
+    public static void kafkaDMP(String[] args)  throws Exception{
+
+        String zkbroker = "localhost:2181";
+        String topicss = "dmp-1";
+        String consumer = "group_id_0";
+        int numThreads = 1;
+
+        //StreamingExamples.setStreamingLogLevels();
+        SparkConf sparkConf = new SparkConf().setAppName("JavaKafkaWordCount");
+        // Create the context with 2 seconds batch size
+        JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, new Duration(2000));
+
+        Map<String, Integer> topicMap = new HashMap<>();
+        topicMap.put(topicss, numThreads);
+
+        JavaPairReceiverInputDStream<String, String> messages =
+                KafkaUtils.createStream(jssc, zkbroker, consumer, topicMap);
+
+        JavaDStream<PlayCount> events = messages.map(line -> {
+            JsonObject resultObject = new JsonParser().parse(line._2()).getAsJsonObject();
+            Long vpId = resultObject.get("vp_id").getAsLong();
+            int count = resultObject.get("play_count").getAsInt();
+            return new PlayCount(vpId, count);
+        });
+
+        JavaPairDStream<Long, Integer> playStream = events.mapToPair(new IpTuple());
+        JavaPairDStream<Long, Integer> playCountStream = playStream.reduceByKey((i1, i2) -> i1 + i2);
+
+        playCountStream.foreachRDD( rdd -> {
+            rdd.foreachPartition( partRecords -> {
+                partRecords.forEachRemaining( pair -> {
+                    Long vpId = pair._1();
+                    Integer count = pair._2();
+
+                    //写入到redis
+                    String key = String.format(DMPREDIS, vpId);
+                    jedis.incrBy(key, count);
+                });
+            });
+        });
+
+        jssc.start();
+        jssc.awaitTermination();
+    }
+
 }
 
