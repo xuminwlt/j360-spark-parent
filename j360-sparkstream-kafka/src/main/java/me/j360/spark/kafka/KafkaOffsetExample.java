@@ -130,6 +130,7 @@ public class KafkaOffsetExample {
         JavaDStream<String> javaDStream = messages.transform(rdd -> {
             OffsetRange[] offsets = ((HasOffsetRanges) rdd.rdd()).offsetRanges();
             offsetRanges.set(offsets);
+
             return rdd;
         });
 

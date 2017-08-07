@@ -158,6 +158,7 @@ public class Main {
         Set<String> topicsSet = new HashSet<>(Arrays.asList(topics.split(",")));
         Map<String, String> kafkaParams = new HashMap<>();
         kafkaParams.put("metadata.broker.list", brokers);
+        kafkaParams.put("auto.offset.reset", "smallest");
 
         // Create direct kafka stream with brokers and topics
         JavaPairInputDStream<String, String> messages = KafkaUtils.createDirectStream(

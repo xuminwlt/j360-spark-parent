@@ -55,14 +55,7 @@ public class JedisUtil {
         int count = 0;
         do
         {
-            try
-            {
-                jedis = getPool(ip,port).getResource();
-            }
-            catch (Exception e)
-            {
-                getPool(ip,port).returnBrokenResource(jedis);
-            }
+            jedis = getPool(ip,port).getResource();
         }
         while(jedis == null && count<RedisConfig.RETRY_NUM);
         return jedis;
@@ -71,7 +64,7 @@ public class JedisUtil {
     public void closeJedis(Jedis jedis, String ip, int port){
         if(jedis != null)
         {
-            getPool(ip,port).returnResource(jedis);
+            getPool(ip,port).getResource().close();
         }
     }
 }
