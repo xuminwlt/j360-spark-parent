@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 public class Main {
 
     private static final Pattern SPACE = Pattern.compile(" ");
-    private static final String ipAddr = "123.59.27.210";
+    private static final String ipAddr = "localhost";
     private static final int port = 6379;
     private static Jedis jedis= null;
     private static String DMPREDIS = "tv:vp:dmp:%d";

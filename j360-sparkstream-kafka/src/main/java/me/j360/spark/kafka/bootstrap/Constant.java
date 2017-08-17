@@ -15,7 +15,7 @@ public class Constant {
     public static String groupId = "me.j360.spark";
     public static int partitions = 10;
 
-    public static final String ipAddr = "123.59.27.210";
+    public static final String ipAddr = "localhost";
     public static final int port = 6379;
     public static String DMPREDIS = "tv:vp:dmp:%d";
 
