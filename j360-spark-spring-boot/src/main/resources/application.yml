@@ -1,0 +1,11 @@
+spring:
+  main:
+    web_environment: false
+
+app:
+  name: j360-spark
+  topic: dmp
+  groupId: me.j360.me.spark.spring
+  duration: 10000
+  brokerlist: localhost:9092
+
