@@ -11,6 +11,7 @@
     <modules>
         <module>j360-sparkstream-kafka</module>
         <module>j360-spark-spring-boot</module>
+        <module>j360-spark-conf</module>
     </modules>
 
     <parent>
