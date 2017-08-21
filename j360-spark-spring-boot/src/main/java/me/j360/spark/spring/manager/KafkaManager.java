@@ -18,6 +18,7 @@ import scala.Tuple2;
 import scala.collection.JavaConversions;
 import scala.collection.JavaConverters$;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 
 
-public class KafkaManager {
+public class KafkaManager implements Serializable {
 
     private KafkaCluster kafkaCluster = null;
     private Map<TopicAndPartition, Long> fromOffsets = new HashMap<TopicAndPartition, Long>();

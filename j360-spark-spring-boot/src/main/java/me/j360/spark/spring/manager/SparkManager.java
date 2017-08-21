@@ -13,6 +13,7 @@ import org.apache.spark.streaming.api.java.JavaStreamingContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.Serializable;
 import java.util.Collections;
 
 /**
@@ -24,12 +25,15 @@ import java.util.Collections;
 
 @Slf4j
 @Component
-public class SparkManager {
+public class SparkManager implements Serializable {
 
     @Autowired
     private AppConfig appConfig;
     @Autowired
     private KafkaManager kafkaManager;
+
+    //@Autowired
+    //private transient JavaSparkContext sc;
 
     public void start() {
         SparkConf sparkConf = new SparkConf().setAppName(appConfig.getAppName());
