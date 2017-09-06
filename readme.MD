@@ -24,6 +24,12 @@ $redis-cli
 $get key
 
 
+### Spark Cluster
+
+1. 启动Master
+2. 启动Slave1 Slave2
+3. 提交Spark任务
+
 ### Flume环境
 
 flume-ng agent -n dmpagent -c conf -f conf/flume-conf.properties.template
