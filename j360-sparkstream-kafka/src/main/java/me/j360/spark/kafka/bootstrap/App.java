@@ -14,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.streaming.Duration;
 import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.streaming.api.java.JavaInputDStream;
@@ -30,10 +31,7 @@ import javax.jms.JMSException;
 import javax.jms.MapMessage;
 import javax.jms.MessageProducer;
 import javax.jms.Session;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -191,22 +189,32 @@ public class App {
                     });
                 });
 
-        //Process And Update Offset
-        if (Objects.nonNull(offsetRanges.get())) {
-            for(OffsetRange o: offsetRanges.get()){
-                // 封装topic.partition 与 offset对应关系 java Map
-                TopicAndPartition topicAndPartition = new TopicAndPartition(o.topic(), o.partition());
-                Map<TopicAndPartition, Object> topicAndPartitionObjectMap = new HashMap<TopicAndPartition, Object>();
-                topicAndPartitionObjectMap.put(topicAndPartition, o.untilOffset());
+        javaDStream.foreachRDD(new VoidFunction<JavaRDD<String>>() {
+            @Override
+            public void call(JavaRDD<String> v1) throws Exception {
+                //OffsetRange[] offsets = ((HasOffsetRanges) arg0.rdd()).offsetRanges();
+                //for(OffsetRange o: offsets){
+                if (v1.isEmpty()) return;
+                List<String> list = v1.collect();
+                for(String s:list){
+                    log.info("data:[{}]",s);
+                }
 
-                // 转换java map to scala immutable.map
-                scala.collection.immutable.Map<TopicAndPartition, Object> scalatopicAndPartitionObjectMap =
-                        convert(topicAndPartitionObjectMap);
+                for (OffsetRange o : offsetRanges.get()) {
+                    // 封装topic.partition 与 offset对应关系 java Map
+                    TopicAndPartition topicAndPartition = new TopicAndPartition(o.topic(), o.partition());
+                    Map<TopicAndPartition, Object> topicAndPartitionObjectMap = new HashMap<TopicAndPartition, Object>();
+                    topicAndPartitionObjectMap.put(topicAndPartition, o.untilOffset());
 
-                // 更新offset到kafkaCluster
-                kafkaCluster.setConsumerOffsets(Constant.groupId, scalatopicAndPartitionObjectMap);
+                    // 转换java map to scala immutable.map
+                    scala.collection.immutable.Map<TopicAndPartition, Object> scalatopicAndPartitionObjectMap =
+                            convert(topicAndPartitionObjectMap);
+
+                    // 更新offset到kafkaCluster
+                    kafkaCluster.setConsumerOffsets(Constant.groupId, scalatopicAndPartitionObjectMap);
+                }
             }
-        }
+        });
 
         jsctx.start();
         try {
