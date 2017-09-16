@@ -20,7 +20,17 @@ public class RedisClient {
     private RedisClient(String host){
         this.host = host;
         Runtime.getRuntime().addShutdownHook(new CleanWorkThread());
-        jedisPool = new JedisPool(new GenericObjectPoolConfig(), host);
+        GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+        config.setMaxIdle(10);
+        config.setMaxTotal(50);
+        config.setMinIdle(3);
+        config.setMaxWaitMillis(30000L);
+        config.setTestOnBorrow(true);
+        config.setTestOnReturn(true);
+        config.setTestOnCreate(true);
+        config.setTestWhileIdle(true);
+
+        jedisPool = new JedisPool(config, host);
     }
 
     private static RedisClient singleton;
